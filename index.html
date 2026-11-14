@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Céu Vivo</title>
+<meta name="robots" content="noindex, nofollow, noimageindex, noarchive">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05070f; cursor: default; }
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  #scene { position: absolute; inset: -2.2%; will-change: transform; }
+  #scene img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; opacity: 0; user-select: none; -webkit-user-drag: none; }
+  #tint, #haze { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 6s linear; }
+  #tint { background: linear-gradient(#3b4250, #5a606b 55%, #2b2f38); mix-blend-mode: multiply; }
+  #haze { background: rgb(222,228,234); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+  #flash { position: absolute; inset: 0; background: #dfe8ff; opacity: 0; pointer-events: none; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #water { position: absolute; pointer-events: none; }
+  #verse { position: absolute; right: 2.6%; top: 5.5%; width: 14.5%; text-align: right; color: #fff;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; font-style: italic;
+    line-height: 1.55; letter-spacing: .015em; opacity: 0; transition: opacity 4s ease;
+    text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 10px rgba(0,0,0,.6), 0 0 34px rgba(0,0,0,.5); will-change: transform; }
+  #verse .ref { display: block; margin-top: .9em; font-style: normal; font-size: .62em; letter-spacing: .28em; text-transform: uppercase; opacity: .85; }
+  #sig { position: absolute; right: 1.9%; bottom: 5.4%; width: 3.1%; overflow: visible; opacity: .46; }
+  #sig text { font-family: Georgia, "Times New Roman", serif; font-style: italic; fill: #fff; }
+  #sig .w { font-size: 118px; letter-spacing: -6px; }
+  #sig .p { font-size: 92px; }
+  #sig path { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="scene">
+    <img id="img0" src="por-do-sol.jpg" alt="">
+    <img id="img1" src="noite.jpg" alt="">
+    <canvas id="water"></canvas>
+    <div id="haze"></div>
+  </div>
+  <div id="tint"></div>
+  <canvas id="fx"></canvas>
+  <div id="flash"></div>
+  <div id="verse"></div>
+  <svg id="sig" viewBox="0 0 200 150" aria-hidden="true">
+    <text class="w" x="14" y="98">W</text>
+    <text class="p" x="104" y="112">P</text>
+    <path d="M10 122 C 60 112, 120 112, 168 116 S 192 110, 196 102"/>
+  </svg>
+</div>
+<script src="lago.js"></script>
+<script>
+"use strict";
+/* ---------- Configuração ---------- */
+const LAT = -23.550, LON = -46.633;          // São Paulo (centro)
+const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=" + LAT + "&longitude=" + LON + "&current=weather_code,cloud_cover";
+const VERSES = [
+["Josué 1:9","Não to mandei eu? Sê forte e corajoso; não temas, nem te espantes; porque o Senhor teu Deus é contigo, por onde quer que andares."],
+["Provérbios 3:5–6","Confia no Senhor de todo o teu coração, e não te estribes no teu próprio entendimento. Reconhece-o em todos os teus caminhos, e ele endireitará as tuas veredas."],
+["Mateus 5:16","Assim resplandeça a vossa luz diante dos homens, para que vejam as vossas boas obras, e glorifiquem a vosso Pai, que está nos céus."],
+["Mateus 6:33","Mas buscai primeiro o reino de Deus, e a sua justiça, e todas essas coisas vos serão acrescentadas."],
+["Mateus 7:7","Pedi, e dar-se-vos-á; buscai, e encontrareis; batei, e abrir-se-vos-á."],
+["Mateus 11:28","Vinde a mim, todos os que estais cansados e oprimidos, e eu vos aliviarei."],
+["Mateus 17:20","porque em verdade vos digo que, se tivésseis fé como um grão de mostarda, diríeis a este monte: Passa daqui para acolá; e haveria de passar; e nada vos seria impossível."],
+["Mateus 28:20","e eis que eu estou convosco todos os dias, até a consumação dos séculos. Amém."],
+["Marcos 9:23","E Jesus disse-lhe: Se tu podes crer, tudo é possível ao que crê."],
+["João 8:12","Falou-lhes, pois, Jesus outra vez, dizendo: Eu sou a luz do mundo; quem me segue não andará em trevas, mas terá a luz da vida."],
+["João 13:34","Um novo mandamento vos dou: Que vos ameis uns aos outros, como eu vos amei a vós, que também vós uns a outros vos ameis."],
+["João 14:6","Disse-lhe Jesus: Eu sou o caminho, e a verdade, e a vida. Ninguém vem ao Pai, senão por mim."],
+["João 14:27","Deixo-vos a paz, a minha paz vos dou; não vô-la dou como o mundo a dá. Não se turbe o vosso coração, nem se atemorize."],
+["João 16:33","Tenho-vos dito essas coisas para que em mim tenhais paz; no mundo tereis aflição, mas tende bom ânimo, eu venci o mundo."],
+["João 20:29","Disse-lhe Jesus: Porque me viste, Tomé, creste; bem-aventurados os que não viram, e creram."],
+["Filipenses 4:13","Posso todas as coisas em Cristo que me fortalece."],
+["Tiago 1:22","E sede cumpridores da palavra, e não somente ouvintes, enganando-vos a vós mesmos."],
+["Tiago 2:17","Assim também a fé, se não tiver as obras, está morta em si mesma."],
+["Tiago 2:18","Porém dirá alguém: Tu tens a fé, e eu tenho as obras; mostra-me a tua fé sem as tuas obras, e eu te mostrarei a minha fé pelas minhas obras."],
+["1 Néfi 3:7","E aconteceu que eu, Néfi, disse a meu pai: Eu irei e cumprirei as ordens do Senhor, porque sei que o Senhor nunca dá ordens aos filhos dos homens sem antes preparar um caminho pelo qual suas ordens possam ser cumpridas."],
+["2 Néfi 31:20","Deveis, pois, prosseguir com firmeza em Cristo, tendo um perfeito esplendor de esperança e amor a Deus e a todos os homens. Portanto, se assim prosseguirdes, banqueteando-vos com a palavra de Cristo, e perseverardes até o fim, eis que assim diz o Pai: Tereis vida eterna."],
+["Mosias 2:17","E eis que vos digo estas coisas para que aprendais sabedoria; para que saibais que, quando estais a serviço de vosso próximo, estais somente a serviço de vosso Deus."],
+["Alma 32:21","E agora, conforme falei com referência à fé — fé não é ter um perfeito conhecimento das coisas; portanto, se tendes fé, tendes esperança nas coisas que se não veem e que são verdadeiras."],
+["Alma 37:6","Ora, podes supor que isto seja tolice de minha parte; mas eis que te digo que é por meio de coisas pequenas e simples que as grandes são realizadas; e pequenos meios muitas vezes confundem os sábios."],
+["Alma 37:37","Aconselha-te com o Senhor em tudo que fizeres e ele dirigir-te-á para o bem; sim, quando te deitares à noite, repousa no Senhor, para que ele possa velar por ti em teu sono; e quando te levantares pela manhã, tem o teu coração cheio de agradecimento a Deus; e se fizeres essas coisas, serás elevado no último dia."],
+["Éter 12:6","portanto, não disputeis porque não vedes, porque não recebeis testemunho senão depois da prova de vossa fé."],
+["Éter 12:27","E se os homens vierem a mim, mostrar-lhes-ei sua fraqueza. […] então farei com que as coisas fracas se tornem fortes para eles."],
+["3 Néfi 27:27","Em verdade vos digo que devereis ser como eu sou."],
+["Doutrina e Convênios 6:36","Buscai-me em cada pensamento; não duvideis, não temais."],
+["Doutrina e Convênios 58:27","Em verdade eu digo: Os homens devem ocupar-se zelosamente numa boa causa e fazer muitas coisas de sua livre e espontânea vontade e realizar muita retidão."],
+["Doutrina e Convênios 64:33","Portanto, não vos canseis de fazer o bem, porque estais lançando o alicerce de uma grande obra. E de pequenas coisas provém aquilo que é grande."]
+];
+
+/* ---------- Estado ---------- */
+const $ = id => document.getElementById(id);
+const imgs = [0,1].map(i => $("img"+i));
+const cv = $("fx"), cx = cv.getContext("2d");
+let W = 0, H = 0, night = 0;
+let force = { phase: null, weather: null };
+let weather = { kind: "clear", cloud: 0 };          // clear | cloudy | fog | rain | storm
+let rainAmt = 0, mx = 0, my = 0, tx = 0, ty = 0, mpx = -9999, mpy = -9999;
+const q = new URLSearchParams(location.search);
+const PH = { tarde: 0, noite: 1 };
+if (q.get("fase") in PH) force.phase = PH[q.get("fase")];
+const WX = { limpo: "clear", nublado: "cloudy", neblina: "fog", chuva: "rain", tempestade: "storm" };
+if (q.get("clima") in WX) force.weather = WX[q.get("clima")];
+
+/* ---------- Sol (nascer e pôr em horas locais) ---------- */
+function sunTimes(d) {
+  const rad = Math.PI / 180, start = new Date(d.getFullYear(), 0, 0);
+  const n = Math.floor((d - start) / 864e5);
+  const g = 2 * Math.PI / 365 * (n - 1);
+  const eq = 229.18 * (0.000075 + 0.001868*Math.cos(g) - 0.032077*Math.sin(g) - 0.014615*Math.cos(2*g) - 0.040849*Math.sin(2*g));
+  const dec = 0.006918 - 0.399912*Math.cos(g) + 0.070257*Math.sin(g) - 0.006758*Math.cos(2*g) + 0.000907*Math.sin(2*g);
+  const ha = Math.acos(Math.cos(90.833*rad) / (Math.cos(LAT*rad)*Math.cos(dec)) - Math.tan(LAT*rad)*Math.tan(dec)) / rad;
+  const tz = -d.getTimezoneOffset();
+  const noon = 720 - 4*LON - eq + tz;
+  return { rise: (noon - 4*ha) / 60, set: (noon + 4*ha) / 60 };
+}
+
+/* ---------- Mistura das fases ---------- */
+// devolve pesos [pôr do sol, noite]: pôr do sol durante o dia, noite depois que escurece
+function phaseWeights(d) {
+  if (force.phase !== null) return force.phase ? [0,1] : [1,0];
+  const h = d.getHours() + d.getMinutes()/60 + d.getSeconds()/3600, s = sunTimes(d);
+  const ss = (a, b, x) => { let t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t*t*(3 - 2*t); };
+  const n = h > 12 ? ss(s.set - 0.25, s.set + 1.0, h) : 1 - ss(s.rise - 1.0, s.rise + 0.25, h);
+  return [1 - n, n];
+}
+function applyPhase() {
+  const w = phaseWeights(new Date());
+  // empilha: cada camada com opacidade tal que o resultado é a mistura correta
+  let acc = 0;
+  for (let i = 0; i < 2; i++) {
+    acc += w[i];
+    const o = acc > 0 ? w[i] / acc : 0;
+    imgs[i].style.opacity = o.toFixed(3);
+    imgs[i].style.visibility = o > 0.001 ? "visible" : "hidden";
+  }
+  curW = w;
+  night = w[1];
+  const hz = $("haze"), n = night; hz.style.backgroundColor = "rgb(" + Math.round(222 - 150*n) + "," + Math.round(228 - 146*n) + "," + Math.round(234 - 128*n) + ")";
+  $("verse").style.opacity = ($("verse").dataset.on ? (0.50 + 0.18*night) : 0);
+}
+
+/* ---------- Clima real ---------- */
+function setWeather(kind, cloud) {
+  weather = { kind, cloud };
+  const k = force.weather || kind;
+  const c = force.weather ? (k === "clear" ? 0 : 90) : cloud;
+  let tint = 0, haze = 0;
+  if (k === "cloudy") tint = 0.15 + 0.3 * Math.max(0, (c - 40) / 60);
+  if (k === "fog")   { tint = 0.28; }
+  if (k === "rain")  { tint = 0.5; }
+  if (k === "storm") { tint = 0.62; }
+  $("tint").style.opacity = tint; $("haze").style.opacity = haze;
+}
+function curWeather() { return force.weather || weather.kind; }
+async function fetchWeather() {
+  try {
+    const r = await fetch(WEATHER_URL, { cache: "no-store" });
+    const j = await r.json(), code = j.current.weather_code, cloud = j.current.cloud_cover;
+    let kind = "clear";
+    if (code === 45 || code === 48) kind = "fog";
+    else if (code >= 95) kind = "storm";
+    else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) kind = "rain";
+    else if (code >= 2 || cloud > 55) kind = cloud > 40 ? "cloudy" : "clear";
+    setWeather(kind, cloud);
+  } catch (e) { /* sem internet: mantém o último clima */ }
+}
+
+/* ---------- Versículo do dia ---------- */
+function setVerse() {
+  const d = new Date(), v = VERSES[(d.getDate() - 1) % VERSES.length], el = $("verse");
+  if (el.dataset.day === String(d.getDate())) return;
+  el.dataset.day = d.getDate();
+  el.textContent = "";
+  el.appendChild(document.createTextNode("“" + v[1] + "”"));
+  const ref = document.createElement("span"); ref.className = "ref"; ref.textContent = v[0]; el.appendChild(ref);
+  const len = v[1].length;
+  const size = len < 90 ? 2.05 : len < 150 ? 1.72 : len < 220 ? 1.45 : len < 290 ? 1.25 : 1.1;
+  el.style.fontSize = "calc(" + size + " * 0.50vw)";
+  setTimeout(() => { el.dataset.on = "1"; applyPhase(); }, 1200);
+}
+
+/* ---------- Partículas ---------- */
+const rnd = (a, b) => a + Math.random() * (b - a);
+const MOON = (window.CEU && window.CEU.lua) || [.5, .31];
+let stars = [], drops = [], ripples = [], flies = [], sat = null, meteor = null, nextSat = 6, nextMeteor = 25, nextFlash = 8;
+function build() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  stars = []; for (let i = 0; i < 150; i++) stars.push({ x: rnd(.5, 1), y: Math.pow(Math.random(), 1.4) * .40, r: rnd(.5, 1.5), p: rnd(0, 6.28), s: rnd(.5, 1.9) });
+  drops = []; for (let i = 0; i < 520; i++) drops.push({ x: Math.random(), y: Math.random(), l: rnd(10, 26), v: rnd(.9, 1.5), o: rnd(.12, .4) });
+  ripples = [];
+}
+let last = 0, tSec = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (document.hidden) return;
+  if (now - last < 15.5) return;                 // no máximo ~60 quadros por segundo
+  const dt = Math.min(0.05, (now - last) / 1000 || 0.016); last = now; tSec += dt;
+
+  // profundidade com o mouse
+  mx += (tx - mx) * 0.05; my += (ty - my) * 0.05;
+  $("scene").style.transform = "translate3d(" + (-mx * 14).toFixed(2) + "px," + (-my * 8).toFixed(2) + "px,0)";
+  $("verse").style.transform = "translate3d(" + (mx * 9).toFixed(2) + "px," + (my * 5).toFixed(2) + "px,0)";
+
+  drawWater(now);
+  const k = curWeather(), raining = k === "rain" || k === "storm";
+  rainAmt += ((raining ? (k === "storm" ? 1 : .7) : 0) - rainAmt) * Math.min(1, dt * .6);
+  const skyClear = k === "clear" ? 1 : k === "cloudy" ? .35 : 0;
+  const nightFx = night * skyClear;
+  if (nightFx < .01 && rainAmt < .01) { cx.clearRect(0, 0, W, H); return; }
+  cx.clearRect(0, 0, W, H);
+
+  if (nightFx > .01) {
+    const ox = mx * 5, oy = my * 3;
+    // estrelas que cintilam (brilham mais perto do cursor)
+    for (const s of stars) {
+      const x = s.x * W + ox, y = s.y * H + oy;
+      let a = (.35 + .65 * Math.abs(Math.sin(tSec * s.s + s.p))) * nightFx;
+      const dx = x - mpx, dy = y - mpy, near = Math.max(0, 1 - Math.hypot(dx, dy) / 240);
+      if (Math.hypot(s.x - MOON[0], (s.y - MOON[1]) * H / W) < .06) continue;   // não desenha sobre a lua
+      const r = s.r * (1 + near * .9);
+      cx.globalAlpha = Math.min(1, a * (.55 + near)); cx.fillStyle = "#fff";
+      cx.beginPath(); cx.arc(x, y, r, 0, 6.283); cx.fill();
+    }
+    // satélite
+    nextSat -= dt;
+    if (!sat && nextSat <= 0) { const y0 = rnd(.06, .3); sat = { x: .5, y: y0, vx: rnd(.012, .02), vy: rnd(-.003, .004), iss: Math.random() < .25 }; }
+    if (sat) {
+      sat.x += sat.vx * dt; sat.y += sat.vy * dt;
+      const fade = Math.min(1, (sat.x - .5) * 12, (1.02 - sat.x) * 12);
+      cx.globalAlpha = Math.max(0, fade) * nightFx * (sat.iss ? .95 : .7); cx.fillStyle = sat.iss ? "#fff3d6" : "#fff";
+      cx.beginPath(); cx.arc(sat.x * W, sat.y * H, sat.iss ? 2 : 1.2, 0, 6.283); cx.fill();
+      if (sat.x > 1.03) { sat = null; nextSat = rnd(25, 70); }
+    }
+    // meteoro
+    nextMeteor -= dt;
+    if (!meteor && nextMeteor <= 0) meteor = { x: rnd(.45, .95), y: rnd(.04, .25), t: 0 };
+    if (meteor) {
+      meteor.t += dt; const p = meteor.t / .9, x = (meteor.x - p * .09) * W, y = (meteor.y + p * .06) * H;
+      const g = cx.createLinearGradient(x, y, x + 90, y - 60); g.addColorStop(0, "rgba(255,255,255," + (.9 * (1 - p) * nightFx) + ")"); g.addColorStop(1, "rgba(255,255,255,0)");
+      cx.globalAlpha = 1; cx.strokeStyle = g; cx.lineWidth = 1.6; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x + 90, y - 60); cx.stroke();
+      if (p >= 1) { meteor = null; nextMeteor = rnd(50, 160); }
+    }
+  }
+  // chuva e ondulações no lago
+  if (rainAmt > .01) {
+    cx.strokeStyle = "#cfd9e6"; cx.lineWidth = 1.1; cx.lineCap = "round";
+    const n = Math.floor(drops.length * rainAmt);
+    for (let i = 0; i < n; i++) {
+      const d = drops[i]; d.y += d.v * dt * 1.6; d.x -= d.v * dt * .16;
+      if (d.y > 1.03) { d.y = -.03; d.x = Math.random() * 1.15; }
+      const x = d.x * W, y = d.y * H;
+      cx.globalAlpha = d.o * rainAmt; cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x - d.l * .1, y + d.l); cx.stroke();
+    }
+    if (Math.random() < rainAmt * .75) { for (let q = 0; q < 3; q++) { const fx = rnd(.08, 1), fy = rnd(.645, .99); if (onLake(fx, fy)) { const kk = Math.max(W / 3440, H / 1440); ripples.push({ x: (W - 3440 * kk) / 2 + fx * 3440 * kk, y: (H - 1440 * kk) / 2 + fy * 1440 * kk, s: .3 + .7 * (fy - .645) / .345, t: 0 }); break; } } }
+    cx.strokeStyle = "#e6eef8"; cx.lineWidth = 1;
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const r = ripples[i]; r.t += dt; const p = r.t / 1.3;
+      if (p >= 1) { ripples.splice(i, 1); continue; }
+      cx.globalAlpha = (1 - p) * .35; cx.beginPath(); cx.ellipse(r.x, r.y, (4 + p * 26) * r.s, (1.2 + p * 6) * r.s, 0, 0, 6.283); cx.stroke();
+    }
+    if (k === "storm") {
+      nextFlash -= dt;
+      if (nextFlash <= 0) { nextFlash = rnd(9, 30); const f = $("flash"); f.animate([{ opacity: 0 }, { opacity: .5 }, { opacity: .08 }, { opacity: .35 }, { opacity: 0 }], { duration: 520 }); }
+    }
+  }
+  cx.globalAlpha = 1;
+}
+
+/* ---------- Água do lago: ondulação suave, só dentro da máscara do lago ---------- */
+const LB = { x0: (window.CEU && window.CEU.lb ? window.CEU.lb[0] : .07), y0: (window.CEU && window.CEU.lb ? window.CEU.lb[1] : .628), x1: 1, y1: 1 };
+let lakeData = null, lakeW = 0, lakeH = 0;
+(function () { const D = window.CEU; if (!D || !D.lago) return; const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = im.width; c.height = im.height; const g = c.getContext("2d"); g.drawImage(im, 0, 0); try { lakeData = g.getImageData(0, 0, c.width, c.height).data; lakeW = c.width; lakeH = c.height; } catch (e) {} }; im.src = D.lago; })();
+function onLake(fx, fy) { if (!lakeData) return false; const u = (fx - LB.x0) / (1 - LB.x0), v = (fy - LB.y0) / (1 - LB.y0); if (u < 0 || u >= 1 || v < 0 || v >= 1) return false; return lakeData[((v * lakeH | 0) * lakeW + (u * lakeW | 0)) * 4] > 200; }
+const wcv = $("water");
+let wRect = null, wLast = 0, curW = [1,0], gl = null, wProg = null, wTex = [], wMask = null, wU = {}, wReady = 0;
+function layoutWater() {
+  const sc = $("scene"), SW = sc.clientWidth, SH = sc.clientHeight, IW = 3440, IH = 1440;
+  const k = Math.max(SW / IW, SH / IH), dx = (SW - IW * k) / 2, dy = (SH - IH * k) / 2;
+  wRect = { x: dx + LB.x0 * IW * k, y: dy + LB.y0 * IH * k, w: (LB.x1 - LB.x0) * IW * k, h: (LB.y1 - LB.y0) * IH * k };
+  wcv.style.left = wRect.x + "px"; wcv.style.top = wRect.y + "px"; wcv.style.width = wRect.w + "px"; wcv.style.height = wRect.h + "px";
+  wcv.width = Math.round(wRect.w); wcv.height = Math.round(wRect.h);
+  if (gl) gl.viewport(0, 0, wcv.width, wcv.height);
+}
+function initWater() {
+  const D = window.CEU; if (!D) return;
+  try { gl = wcv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false }); } catch (e) { gl = null; }
+  if (!gl) return;
+  const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
+  const vs = "attribute vec2 p; varying vec2 v; void main(){ v = vec2(p.x*.5+.5, .5-p.y*.5); gl_Position = vec4(p,0.,1.); }";
+  const fs = `precision mediump float; varying vec2 v; uniform sampler2D A, B, M; uniform float mixB, t, wind; uniform vec2 res;
+  void main(){
+    float m = texture2D(M, v).r;
+    float d = v.y, sc = mix(.28, 1., d);
+    float w1 = sin(v.y*res.y*.20/sc + t*1.05 + 1.6*sin(v.x*8. + t*.25));
+    float w2 = sin(v.y*res.y*.085/sc - t*.65 + v.x*21.);
+    float w3 = sin(v.x*res.x*.013 + t*.55 + v.y*27.);
+    vec2 off = vec2((w1*.6 + w2*.4)*(1. + 5.*d)/res.x, w3*(.4 + 1.5*d)/res.y)*wind*m*m*m;
+    vec2 u = v + off;
+    vec3 c = mix(texture2D(A, u).rgb, texture2D(B, u).rgb, mixB);
+    c += .03*max(0., w1*w2)*d*wind;
+    float a = smoothstep(.62, .96, m);
+    gl_FragColor = vec4(c*a, a);
+  }`;
+  wProg = gl.createProgram(); gl.attachShader(wProg, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(wProg, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(wProg);
+  if (!gl.getProgramParameter(wProg, gl.LINK_STATUS)) { gl = null; return; }
+  gl.useProgram(wProg);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(wProg, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  ["A","B","M","mixB","t","wind","res"].forEach(n => wU[n] = gl.getUniformLocation(wProg, n));
+  const load = (src, cb) => { const im = new Image(); im.onload = () => { const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, im);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      cb(tx); wReady++; }; im.src = src; };
+  ["por-do-sol","noite"].forEach((n, i) => load(D[n], tx => wTex[i] = tx));
+  load(D.mascara, tx => wMask = tx);
+  gl.viewport(0, 0, wcv.width, wcv.height);
+}
+function drawWater(now) {
+  if (!gl || wReady < 3 || !wRect || now - wLast < 32) return;      // ~30 quadros por segundo
+  wLast = now;
+  const ia = 0, ib = 1, mixB = curW[1];
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, wTex[ia]); gl.uniform1i(wU.A, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, wTex[ib]); gl.uniform1i(wU.B, 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, wMask); gl.uniform1i(wU.M, 2);
+  gl.uniform1f(wU.mixB, mixB); gl.uniform1f(wU.t, now / 1000); gl.uniform1f(wU.wind, 1 + rainAmt * 1.6); gl.uniform2f(wU.res, wcv.width, wcv.height);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+/* ---------- Eventos ---------- */
+addEventListener("mousemove", e => { tx = e.clientX / innerWidth - .5; ty = e.clientY / innerHeight - .5; mpx = e.clientX; mpy = e.clientY; });
+addEventListener("resize", () => { build(); layoutWater(); });
+// pré-visualização: 1 pôr do sol, 2 noite | C limpo, N nublado, F neblina, R chuva, T tempestade | 0 volta ao real
+addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if ("12".includes(k)) force.phase = +k - 1;
+  else if (k === "0") { force.phase = null; force.weather = null; }
+  else if (k === "c") force.weather = "clear"; else if (k === "n") force.weather = "cloudy";
+  else if (k === "f") force.weather = "fog"; else if (k === "r") force.weather = "rain"; else if (k === "t") force.weather = "storm";
+  else return;
+  applyPhase(); setWeather(weather.kind, weather.cloud);
+});
+
+build(); layoutWater(); initWater(); applyPhase(); setVerse(); setWeather("clear", 0); fetchWeather();
+setInterval(() => { applyPhase(); setVerse(); }, 30000);
+setInterval(fetchWeather, 30 * 60000);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
